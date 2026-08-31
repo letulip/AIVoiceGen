@@ -21,9 +21,11 @@ import {
 } from 'lucide-react';
 import { Chapter, StoryProject } from '../types';
 import { estimateReadingTime } from '../utils/audio';
+import { polishStory } from '../services/gemini';
 
 interface StoryEditorProps {
   project: StoryProject;
+  apiKey: string;
   activeChapter: Chapter;
   onUpdateChapterContent: (chapterId: string, content: string) => void;
   onAddChapter: () => void;
@@ -37,6 +39,7 @@ interface StoryEditorProps {
 
 export const StoryEditor: React.FC<StoryEditorProps> = ({
   project,
+  apiKey,
   activeChapter,
   onUpdateChapterContent,
   onAddChapter,
@@ -89,26 +92,18 @@ export const StoryEditor: React.FC<StoryEditorProps> = ({
     setAiError(null);
 
     try {
-      const response = await fetch('/api/story/polish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: activeChapter.content,
-          tone: project.emotion || 'warm-audiobook',
-          action,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok || !data.result) {
-        throw new Error(data.error || 'Failed to refine story text.');
-      }
+      const result = await polishStory(
+        apiKey,
+        activeChapter.content,
+        project.emotion || 'warm-audiobook',
+        action,
+      );
 
       if (action === 'continue-story') {
-        const newContent = activeChapter.content + '\n\n' + data.result.trim();
+        const newContent = activeChapter.content + '\n\n' + result;
         onUpdateChapterContent(activeChapter.id, newContent);
       } else {
-        onUpdateChapterContent(activeChapter.id, data.result.trim());
+        onUpdateChapterContent(activeChapter.id, result);
       }
     } catch (err: any) {
       console.error('AI Polish Error:', err);
