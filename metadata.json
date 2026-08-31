@@ -1,0 +1,6 @@
+{
+  "name": "StoryVoice - Audiobook & Story Voice Generator",
+  "description": "Custom AI voice generator crafted with soft, warm, and engaging female narration for audiobooks, memoirs, and personal storytelling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
