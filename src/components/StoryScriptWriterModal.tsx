@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { X, Sparkles, Wand2, Loader2, BookOpen } from 'lucide-react';
+import { generateStoryScript } from '../services/gemini';
 
 interface StoryScriptWriterModalProps {
   isOpen: boolean;
+  apiKey: string;
   onClose: () => void;
   onApplyScript: (title: string, content: string) => void;
 }
 
 export const StoryScriptWriterModal: React.FC<StoryScriptWriterModalProps> = ({
   isOpen,
+  apiKey,
   onClose,
   onApplyScript,
 }) => {
@@ -27,23 +30,13 @@ export const StoryScriptWriterModal: React.FC<StoryScriptWriterModalProps> = ({
     setError(null);
 
     try {
-      const response = await fetch('/api/story/generate-script', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          genre,
-          theme,
-          protagonist,
-          targetMood,
-        }),
+      const script = await generateStoryScript(apiKey, {
+        genre,
+        theme,
+        protagonist,
+        targetMood,
       });
-
-      const data = await response.json();
-      if (!response.ok || !data.script) {
-        throw new Error(data.error || 'Failed to generate script.');
-      }
-
-      setGeneratedScript(data.script);
+      setGeneratedScript(script);
     } catch (err: any) {
       console.error('Script writer error:', err);
       setError(err.message || 'Could not generate story.');

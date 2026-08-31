@@ -16,9 +16,11 @@ import {
 import { VoicePersona, StoryProject } from '../types';
 import { FEMALE_VOICE_PERSONAS, EMOTION_PRESETS, WARMTH_LEVELS } from '../data/voices';
 import { base64ToBlobUrl } from '../utils/audio';
+import { generateNarration } from '../services/gemini';
 
 interface VoiceSelectorProps {
   project: StoryProject;
+  apiKey: string;
   onChangeVoice: (voiceId: string) => void;
   onChangeWarmth: (warmth: 'whisper' | 'soft-warm' | 'deep-warm' | 'expressive') => void;
   onChangeEmotion: (emotion: string) => void;
@@ -28,6 +30,7 @@ interface VoiceSelectorProps {
 
 export const VoiceSelector: React.FC<VoiceSelectorProps> = ({
   project,
+  apiKey,
   onChangeVoice,
   onChangeWarmth,
   onChangeEmotion,
@@ -59,22 +62,13 @@ export const VoiceSelector: React.FC<VoiceSelectorProps> = ({
     setIsPreviewing(voice.id);
 
     try {
-      const response = await fetch('/api/tts/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: voice.samplePhrase,
-          voiceName: voice.voiceName,
-          stylePrompt: voice.stylePrompt,
-          warmthLevel: voice.warmthLevel,
-          emotion: voice.defaultEmotion,
-        }),
+      const data = await generateNarration(apiKey, {
+        text: voice.samplePhrase,
+        voiceName: voice.voiceName,
+        stylePrompt: voice.stylePrompt,
+        warmthLevel: voice.warmthLevel,
+        emotion: voice.defaultEmotion,
       });
-
-      const data = await response.json();
-      if (!response.ok || !data.audioBase64) {
-        throw new Error(data.error || 'Failed to preview voice.');
-      }
 
       const audioUrl = base64ToBlobUrl(data.audioBase64, data.mimeType || 'audio/wav');
       const audio = new Audio(audioUrl);

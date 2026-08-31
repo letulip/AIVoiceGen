@@ -7,12 +7,15 @@ import { AmbienceMixer } from './components/AmbienceMixer';
 import { SampleStoriesModal } from './components/SampleStoriesModal';
 import { StoryScriptWriterModal } from './components/StoryScriptWriterModal';
 import { AudiobookExportModal } from './components/AudiobookExportModal';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import { StoryProject, Chapter, StorySample } from './types';
 import { FEMALE_VOICE_PERSONAS } from './data/voices';
 import { SAMPLE_STORIES } from './data/samples';
 import { estimateReadingTime } from './utils/audio';
+import { generateNarration } from './services/gemini';
 
 const STORAGE_KEY = 'storyvoice_project_v1';
+const API_KEY_STORAGE_KEY = 'storyvoice_gemini_api_key';
 
 const defaultChapter: Chapter = {
   id: 'chap-1',
@@ -56,11 +59,33 @@ export default function App() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationChapterId, setGenerationChapterId] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState(() => {
+    try {
+      return sessionStorage.getItem(API_KEY_STORAGE_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
 
   // Modals state
   const [isSampleModalOpen, setIsSampleModalOpen] = useState(false);
   const [isScriptGenModalOpen, setIsScriptGenModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+
+  const handleSaveApiKey = (nextApiKey: string) => {
+    const trimmedKey = nextApiKey.trim();
+    setApiKey(trimmedKey);
+    try {
+      if (trimmedKey) {
+        sessionStorage.setItem(API_KEY_STORAGE_KEY, trimmedKey);
+      } else {
+        sessionStorage.removeItem(API_KEY_STORAGE_KEY);
+      }
+    } catch (error) {
+      console.warn('Failed to save the API key for this tab:', error);
+    }
+  };
 
   // Save to localStorage on change
   useEffect(() => {
@@ -269,23 +294,13 @@ export default function App() {
     }));
 
     try {
-      const response = await fetch('/api/tts/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: chapter.content,
-          voiceName: selectedVoice.voiceName,
-          stylePrompt: project.customStylePrompt || selectedVoice.stylePrompt,
-          warmthLevel: project.warmthLevel,
-          speed: project.speed,
-          emotion: project.emotion,
-        }),
+      const data = await generateNarration(apiKey, {
+        text: chapter.content,
+        voiceName: selectedVoice.voiceName,
+        stylePrompt: project.customStylePrompt || selectedVoice.stylePrompt,
+        warmthLevel: project.warmthLevel,
+        emotion: project.emotion,
       });
-
-      const data = await response.json();
-      if (!response.ok || !data.audioBase64) {
-        throw new Error(data.error || 'Voice generation failed. Please try again.');
-      }
 
       setProject((prev) => ({
         ...prev,
@@ -332,6 +347,8 @@ export default function App() {
         onOpenNewProjectModal={handleNewProject}
         onOpenScriptGenModal={() => setIsScriptGenModalOpen(true)}
         onOpenExportModal={() => setIsExportModalOpen(true)}
+        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+        hasApiKey={Boolean(apiKey)}
         isGenerating={isGenerating}
       />
 
@@ -343,6 +360,7 @@ export default function App() {
           <div className="lg:col-span-5 space-y-6">
             <VoiceSelector
               project={project}
+              apiKey={apiKey}
               onChangeVoice={handleSelectVoice}
               onChangeWarmth={handleSelectWarmth}
               onChangeEmotion={handleSelectEmotion}
@@ -361,6 +379,7 @@ export default function App() {
           <div className="lg:col-span-7 space-y-6">
             <StoryEditor
               project={project}
+              apiKey={apiKey}
               activeChapter={activeChapter}
               onUpdateChapterContent={handleUpdateChapterContent}
               onAddChapter={handleAddChapter}
@@ -389,8 +408,16 @@ export default function App() {
 
       <StoryScriptWriterModal
         isOpen={isScriptGenModalOpen}
+        apiKey={apiKey}
         onClose={() => setIsScriptGenModalOpen(false)}
         onApplyScript={handleApplyScript}
+      />
+
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        apiKey={apiKey}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onSave={handleSaveApiKey}
       />
 
       <AudiobookExportModal
